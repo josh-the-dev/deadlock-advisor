@@ -2,9 +2,12 @@
 
 import json
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 API = "https://api.deadlock-api.com"
 CACHE_DIR = Path(__file__).parent / "cache"
@@ -12,7 +15,7 @@ STATS_TTL_S = 6 * 3600  # stats refresh every 6h; assets only change on patches
 ASSETS_TTL_S = 24 * 3600
 
 
-def _get_json(path, params=None):
+def _get_json(path: str, params: dict[str, Any] | None = None) -> Any:
     url = API + path
     if params:
         url += "?" + urllib.parse.urlencode(params)
@@ -21,7 +24,7 @@ def _get_json(path, params=None):
         return json.load(resp)
 
 
-def _cached(name, ttl_s, fetch):
+def _cached(name: str, ttl_s: float, fetch: Callable[[], Any]) -> Any:
     CACHE_DIR.mkdir(exist_ok=True)
     path = CACHE_DIR / f"{name}.json"
     if path.exists() and time.time() - path.stat().st_mtime < ttl_s:
@@ -31,17 +34,17 @@ def _cached(name, ttl_s, fetch):
     return data
 
 
-def heroes():
+def heroes() -> dict[int, str]:
     """{hero_id: name} for active heroes."""
-    raw = _cached("heroes", ASSETS_TTL_S,
-                  lambda: _get_json("/v1/assets/heroes", {"only_active": "true"}))
+    raw = _cached(
+        "heroes", ASSETS_TTL_S, lambda: _get_json("/v1/assets/heroes", {"only_active": "true"})
+    )
     return {h["id"]: h["name"] for h in raw}
 
 
-def items():
+def items() -> dict[int, dict[str, Any]]:
     """{item_id: {name, slot, tier, cost, image}} for upgrade items."""
-    raw = _cached("items", ASSETS_TTL_S,
-                  lambda: _get_json("/v1/assets/items/by-type/upgrade"))
+    raw = _cached("items", ASSETS_TTL_S, lambda: _get_json("/v1/assets/items/by-type/upgrade"))
     return {
         int(i["id"]): {
             "name": i["name"],
@@ -54,7 +57,7 @@ def items():
     }
 
 
-def _download_all(urls, subdir):
+def _download_all(urls: dict[int, str | None], subdir: str) -> dict[int, Path]:
     """Download {key: url} once into cache/<subdir>/<key>.<ext>; return {key: Path}."""
     out_dir = CACHE_DIR / subdir
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -75,28 +78,36 @@ def _download_all(urls, subdir):
     return paths
 
 
-def icons():
+def icons() -> dict[int, Path]:
     """Item icons in cache/icons/<item_id>.<ext>; returns {item_id: Path}."""
     return _download_all({iid: it["image"] for iid, it in items().items()}, "icons")
 
 
-def hero_portraits():
+def hero_portraits() -> dict[int, Path]:
     """Top-bar hero portraits (as on the item-choice screen) in cache/heroes/; {hero_id: Path}."""
-    raw = _cached("heroes", ASSETS_TTL_S,
-                  lambda: _get_json("/v1/assets/heroes", {"only_active": "true"}))
-    return _download_all({h["id"]: (h.get("images") or {}).get("top_bar_vertical_image")
-                          for h in raw}, "heroes")
+    raw = _cached(
+        "heroes", ASSETS_TTL_S, lambda: _get_json("/v1/assets/heroes", {"only_active": "true"})
+    )
+    return _download_all(
+        {h["id"]: (h.get("images") or {}).get("top_bar_vertical_image") for h in raw}, "heroes"
+    )
 
 
-def item_stats(hero_id, game_mode="street_brawl", min_matches=20):
+def item_stats(
+    hero_id: int, game_mode: str = "street_brawl", min_matches: int = 20
+) -> dict[int, dict[str, Any]]:
     """Per-item win/match counts for one hero in the given game mode (last 30 days)."""
     params = {"game_mode": game_mode, "hero_id": hero_id, "min_matches": min_matches}
-    raw = _cached(f"stats_{game_mode}_{hero_id}", STATS_TTL_S,
-                  lambda: _get_json("/v1/analytics/item-stats", params))
+    raw = _cached(
+        f"stats_{game_mode}_{hero_id}",
+        STATS_TTL_S,
+        lambda: _get_json("/v1/analytics/item-stats", params),
+    )
     return {s["item_id"]: s for s in raw}
 
 
-def find_hero(name):
+def find_hero(name: str) -> int:
+    """Hero id by exact or unique partial name (case-insensitive)."""
     name = name.lower().strip()
     for hid, hname in heroes().items():
         if hname.lower() == name:
@@ -107,7 +118,8 @@ def find_hero(name):
     raise ValueError(f"Unknown or ambiguous hero: {name!r}")
 
 
-def find_item(name):
+def find_item(name: str) -> int:
+    """Item id by exact or unique partial name (case-insensitive)."""
     name = name.lower().strip()
     all_items = items()
     for iid, it in all_items.items():

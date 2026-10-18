@@ -17,7 +17,7 @@ yourself.
 Windows, Python 3.12+, and the game in **borderless windowed** mode.
 
 ```
-pip install -r requirements.txt
+pip install -e .
 python overlay.py
 ```
 
@@ -40,6 +40,14 @@ The first run downloads item icons and hero portraits into `cache/` (~10 MB).
 - `python cli.py Yamato "Arctic Blast" "Echo Shard" "Surge of Power"` ranks items by name
 - `python cli.py Yamato --top 10` shows a hero's best items
 - `python detect.py samples/others.png` prints what the detector sees in a screenshot
+
+## Development
+```
+pip install -e ".[dev]"
+ruff format . && ruff check .
+pytest
+```
+See `CLAUDE.md` for architecture, standards and the anti-cheat rules every change must follow.
 
 ## Status
 Early. Tested on 2560×1440; other resolutions are scaled but untested. Enhanced items aren't

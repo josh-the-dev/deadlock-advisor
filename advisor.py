@@ -15,13 +15,21 @@ REROLL_MARGIN = 0.01
 class Rated:
     item_id: int
     name: str
-    score: float      # smoothed win rate
+    score: float  # smoothed win rate
     raw_wr: float | None
     matches: int
     pick_share: float  # matches relative to the hero's most-bought item
 
 
-def rate(hero_id, offered_ids):
+@dataclass
+class Advice:
+    ranked: list[Rated]  # best first
+    baseline: float  # item-weighted average win rate for the hero
+    reroll: bool
+
+
+def rate(hero_id: int, offered_ids: list[int]) -> Advice:
+    """Rank the offered items for a hero by smoothed win rate and decide whether to reroll."""
     stats = data.item_stats(hero_id)
     names = data.items()
     total_w = sum(s["wins"] for s in stats.values())
@@ -33,14 +41,16 @@ def rate(hero_id, offered_ids):
     for iid in offered_ids:
         s = stats.get(iid)
         w, m = (s["wins"], s["matches"]) if s else (0, 0)
-        rated.append(Rated(
-            item_id=iid,
-            name=names.get(iid, {}).get("name", str(iid)),
-            score=(w + PRIOR_WEIGHT * baseline) / (m + PRIOR_WEIGHT),
-            raw_wr=w / m if m else None,
-            matches=m,
-            pick_share=m / top_m,
-        ))
+        rated.append(
+            Rated(
+                item_id=iid,
+                name=names.get(iid, {}).get("name", str(iid)),
+                score=(w + PRIOR_WEIGHT * baseline) / (m + PRIOR_WEIGHT),
+                raw_wr=w / m if m else None,
+                matches=m,
+                pick_share=m / top_m,
+            )
+        )
     rated.sort(key=lambda r: r.score, reverse=True)
     reroll = bool(rated) and rated[0].score < baseline - REROLL_MARGIN
-    return rated, baseline, reroll
+    return Advice(rated, baseline, reroll)
