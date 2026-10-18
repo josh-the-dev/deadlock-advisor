@@ -39,6 +39,9 @@ The baseline is an item-weighted average win rate, so it isn't the hero's true w
 4. Overlay: auto mode done. Next: test it in-game. Distribution to friends: plan a PyInstaller one-file exe (consider dropping OpenCV for Pillow+numpy to cut its size; ORB is the only hard OpenCV dependency).
 5. Possibly: use `include_item_ids`/time filters to compare items within the same draft round more precisely.
 
+## Repo
+Public on GitHub at https://github.com/josh-the-dev/deadlock-advisor (MIT, branch `main`). `cache/` is gitignored; `samples/` is committed. Deps are listed in `requirements.txt`.
+
 ## Working preferences
 - The user wants to **stay within their plan usage and not spend extra credits**. Be frugal: no subagents, minimal web fetches, small focused changes, no exploratory sprawl.
 - Keep dependencies minimal and add them only when needed (e.g. `mss`, `opencv-python`, `PyQt6`).
